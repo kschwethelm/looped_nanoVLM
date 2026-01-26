@@ -7,7 +7,9 @@ import os
 def merge_results():
     parser = argparse.ArgumentParser(description="Merge lmms-eval results for a specific step.")
     parser.add_argument("--run_name", type=str, required=True, help="The name of the training run.")
-    parser.add_argument("--global_step", type=int, required=True, help="Global step for which to merge results.")
+    parser.add_argument(
+        "--global_step", type=int, required=True, help="Global step for which to merge results."
+    )
     args = parser.parse_args()
 
     output_dir = os.path.join("eval_results", args.run_name)

@@ -1,12 +1,14 @@
-import torch
-from torch.utils.data import IterableDataset, get_worker_info
-import threading
-from queue import Queue
-from typing import Iterator
 import itertools
 import random
+import threading
+from collections.abc import Iterator
+from queue import Queue
+
+import torch
+from torch.utils.data import IterableDataset, get_worker_info
 
 random.seed(42)  # Set the random seed to the meaning of life for good luck
+
 
 class ConstantLengthDataset(IterableDataset):
     def __init__(
@@ -35,9 +37,7 @@ class ConstantLengthDataset(IterableDataset):
         )  # 198 is the average tokens for the cauldron dataset
 
     def __len__(self):
-        return int(
-            len(self.dataset) * self._average_length_per_sample / self.seq_length
-        )
+        return int(len(self.dataset) * self._average_length_per_sample / self.seq_length)
 
     def __iter__(self) -> Iterator[dict]:
         """
@@ -63,15 +63,15 @@ class ConstantLengthDataset(IterableDataset):
         def make_base_iterator():
             """Return a (sharded) iterator over the underlying dataset."""
             if not hasattr(self.dataset.dataset, "__len__"):
-                return self.dataset.iter_for_worker()  # with iterable datasets, each worker gets different shards
-            
+                return (
+                    self.dataset.iter_for_worker()
+                )  # with iterable datasets, each worker gets different shards
+
             all_indices = range(len(self.dataset))
 
             # Shard the *indices* first, before any data is fetched.
             if num_workers > 1:
-                worker_indices = itertools.islice(
-                    all_indices, worker_id, None, num_workers
-                )
+                worker_indices = itertools.islice(all_indices, worker_id, None, num_workers)
             else:
                 worker_indices = all_indices
 
@@ -135,9 +135,7 @@ class ConstantLengthDataset(IterableDataset):
                         torch.tensor([self.dataset.tokenizer.pad_token_id]),
                     ]
                 )
-                sample["attention_mask"] = torch.cat(
-                    [sample["attention_mask"], torch.tensor([0])]
-                )
+                sample["attention_mask"] = torch.cat([sample["attention_mask"], torch.tensor([0])])
                 sample["labels"] = torch.cat([sample["labels"], torch.tensor([-100])])
 
                 buffer.append(sample)
@@ -157,12 +155,14 @@ class ConstantLengthDataset(IterableDataset):
             packed_group = []
             for g in groups:
                 packed = self._pack_one_group(g, buffer, self.seq_length)
-                packed_group.append({
-                    "input_ids":      packed[0],
-                    "labels":         packed[1],
-                    "attention_mask": packed[2],
-                    "images":         packed[3],
-                })
+                packed_group.append(
+                    {
+                        "input_ids": packed[0],
+                        "labels": packed[1],
+                        "attention_mask": packed[2],
+                        "images": packed[3],
+                    }
+                )
 
             if packed_group:
                 queue.put(packed_group)
@@ -170,17 +170,13 @@ class ConstantLengthDataset(IterableDataset):
         # finished → unblock consumer
         queue.put(self._sentinel)
 
-    def _balanced_greedy_knapsack(
-        self, buffer, L, delta=0, max_images_per_knapsack=None
-    ):
+    def _balanced_greedy_knapsack(self, buffer, L, delta=0, max_images_per_knapsack=None):
         # Extract lengths and image counts from buffer
         lengths = [len(x["input_ids"]) for x in buffer]
         image_counts = [len(x["images"]) for x in buffer]
 
         # keep the position while sorting
-        items = sorted(
-            enumerate(zip(lengths, image_counts)), key=lambda x: x[1][0], reverse=True
-        )
+        items = sorted(enumerate(zip(lengths, image_counts)), key=lambda x: x[1][0], reverse=True)
 
         min_knapsacks = (sum(lengths) + L - 1) // L + delta
         knapsack_load = [0] * min_knapsacks
@@ -192,14 +188,11 @@ class ConstantLengthDataset(IterableDataset):
             suitable_knapsack = None
 
             # First try to find a knapsack that can fit both constraints
-            for ks_id in sorted(
-                range(len(knapsack_load)), key=knapsack_load.__getitem__
-            ):
+            for ks_id in sorted(range(len(knapsack_load)), key=knapsack_load.__getitem__):
                 length_fits = knapsack_load[ks_id] + item_len <= L
                 image_fits = (
                     max_images_per_knapsack is None
-                    or knapsack_image_counts[ks_id] + item_image_count
-                    <= max_images_per_knapsack
+                    or knapsack_image_counts[ks_id] + item_image_count <= max_images_per_knapsack
                 )
 
                 if length_fits and image_fits:
@@ -218,7 +211,9 @@ class ConstantLengthDataset(IterableDataset):
             knapsack_image_counts[suitable_knapsack] += item_image_count
 
         # remove the completely empty bags that the +delta heuristic created
-        random.shuffle(knapsack_groups)  # Knapsacks are semi-ordered after packing, thanks Luis for noticing!
+        random.shuffle(
+            knapsack_groups
+        )  # Knapsacks are semi-ordered after packing, thanks Luis for noticing!
         return [g for g in knapsack_groups if g]
 
     def _pack_one_group(self, group_indices, batch, max_len):

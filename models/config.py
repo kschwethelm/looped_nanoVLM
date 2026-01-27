@@ -156,7 +156,7 @@ class TrainConfig:
     image_correspondence_min_rating: int = 1
     visual_dependency_min_rating: int = 1
     formatting_min_rating: int = 1
-    wandb_entity: str = "HuggingFace"  # Indicate the entity to log to in wandb
+    wandb_entity: str = "medtum"  # Indicate the entity to log to in wandb
     log_wandb: bool = True
     use_lmms_eval: bool = True  # Use lmms-eval for evaluation
     lmms_eval_tasks: str = "mmstar,mmmu_val,ocrbench,textvqa_val,docvqa_val,scienceqa,mme,infovqa_val,chartqa"  # Pass additional task as one string, seperated by commas without spaces (e.g. 'mmstar,mmmu,ocrbench')

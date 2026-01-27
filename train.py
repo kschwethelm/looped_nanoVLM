@@ -455,9 +455,7 @@ def train(train_cfg, vlm_cfg):
                 dtype=torch.bfloat16 if device.type in ["cuda", "cpu"] else torch.float16,
             )
             with autocast_context, context:
-                _, loss = model(
-                    input_ids, images, attention_mask=attention_mask, targets=labels
-                )
+                _, loss = model(input_ids, images, attention_mask=attention_mask, targets=labels)
 
             if train_cfg.gradient_accumulation_steps > 1:
                 loss = loss / train_cfg.gradient_accumulation_steps
@@ -653,9 +651,7 @@ def train(train_cfg, vlm_cfg):
                             try:
                                 step = int(match.group(1))
                                 if step not in logged_eval_steps:
-                                    with open(
-                                        os.path.join(eval_results_dir, result_file)
-                                    ) as f:
+                                    with open(os.path.join(eval_results_dir, result_file)) as f:
                                         eval_data = json.load(f)
 
                                     lmms_results = eval_data.get("results", {})
@@ -689,10 +685,7 @@ def train(train_cfg, vlm_cfg):
             # Log batch loss
             if is_update_step:
                 # ALL RANKS: gather loss from all ranks if DDP
-                if is_dist():
-                    batch_loss_gathered = dist_mean_scalar(batch_loss)
-                else:
-                    batch_loss_gathered = batch_loss
+                batch_loss_gathered = dist_mean_scalar(batch_loss) if is_dist() else batch_loss
 
                 # MASTER ONLY: Log to wandb
                 if train_cfg.log_wandb and is_master():
@@ -785,6 +778,9 @@ def main():
     parser.add_argument("--compile", type=bool, help="Use torch.compile to optimize the model")
     parser.add_argument("--log_wandb", type=bool, help="Log to wandb")
     parser.add_argument(
+        "--wandb_entity", type=str, help="Wandb entity (username or team) to log to"
+    )
+    parser.add_argument(
         "--resume_from_vlm_checkpoint",
         type=bool,
         default=False,
@@ -808,6 +804,10 @@ def main():
     parser.add_argument(
         "--formatting_min_rating", type=int, help="Minimum formatting rating of images per sample"
     )
+    parser.add_argument("--batch_size", type=int, help="Batch size per device")
+    parser.add_argument(
+        "--gradient_accumulation_steps", type=int, help="Number of gradient accumulation steps"
+    )
 
     args = parser.parse_args()
 
@@ -826,6 +826,8 @@ def main():
         train_cfg.compile = args.compile
     if args.no_log_wandb is True:
         train_cfg.log_wandb = False
+    if args.wandb_entity is not None:
+        train_cfg.wandb_entity = args.wandb_entity
     if args.train_dataset_path is not None:
         train_cfg.train_dataset_path = args.train_dataset_path
     if args.relevance_min_rating is not None:
@@ -836,6 +838,10 @@ def main():
         train_cfg.visual_dependency_min_rating = args.visual_dependency_min_rating
     if args.formatting_min_rating is not None:
         train_cfg.formatting_min_rating = args.formatting_min_rating
+    if args.batch_size is not None:
+        train_cfg.batch_size = args.batch_size
+    if args.gradient_accumulation_steps is not None:
+        train_cfg.gradient_accumulation_steps = args.gradient_accumulation_steps
 
     if args.resume_from_vlm_checkpoint and args.vlm_checkpoint_path is not None:
         train_cfg.resume_from_vlm_checkpoint = True

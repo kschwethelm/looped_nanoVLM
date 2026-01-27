@@ -44,10 +44,7 @@ class BaseCollator:
             return batch
 
         # Pad samples to max length
-        if max_length is not None:
-            max_len = max_length
-        else:
-            max_len = max(map(len, batch["input_ids"]))
+        max_len = max_length if max_length is not None else max(map(len, batch["input_ids"]))
         self._pad_batch(
             batch, max_len
         )  #  dictionaries in Python are mutable and passed by reference

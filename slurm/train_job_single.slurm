@@ -23,5 +23,5 @@ torchrun --nproc_per_node=1 train.py \
     --vlm_checkpoint_path /dss/dssmcmlfs01/pn73mu/pn73mu-dss-0000/kristian/looped_nanoVLM/checkpoints \
     --log_wandb True \
     --wandb_entity "medtum" \
-    --batch_size 4 \
-    --gradient_accumulation_steps 4
+    --batch_size 2 \
+    --gradient_accumulation_steps 8
